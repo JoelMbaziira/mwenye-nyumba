@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Refined utilitarian palette
+       Background: warm off-white (slight cream)
+       Foreground: dark slate
+       Primary: deep slate
+       Accent: amber (warmth/money) */
+    --background: 40 30% 97%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    --primary: 215 30% 18%;
+    --primary-foreground: 40 30% 97%;
+
+    --secondary: 40 20% 92%;
+    --secondary-foreground: 215 25% 15%;
+
+    --muted: 40 15% 93%;
+    --muted-foreground: 215 12% 42%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 215 30% 12%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 215 30% 18%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    font-feature-settings: "ss01", "cv11";
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+    font-feature-settings: "ss01", "ss02";
+  }
+}
+
+/* Subtle paper texture for warmth without noise */
+.bg-paper {
+  background-image:
+    radial-gradient(at 0% 0%, hsl(40 40% 95%) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsl(38 60% 96%) 0px, transparent 50%);
+  background-color: hsl(var(--background));
+}
+
+/* Money figures get a refined treatment */
+.tabular-figures {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
