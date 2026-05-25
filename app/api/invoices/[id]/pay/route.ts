@@ -3,7 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 
 const VALID_PROVIDERS = new Set(["MTN MoMo", "Airtel Money", "M-Pesa"]);
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function POST(req: Request, { params }: RouteContext) {
+  // 1. Unbox the dynamic invoice ID safely by awaiting the promise
+  const { id } = await params;
+
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   const { phone, provider } = body ?? {};
@@ -20,7 +27,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("pay_invoice", {
-    invoice_id: params.id,
+    invoice_id: id, // 2. Used the cleanly unwrapped string variable here
     pay_phone: phone,
     pay_provider: provider,
   });
