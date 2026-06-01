@@ -4,70 +4,69 @@
 
 @layer base {
   :root {
-    /* Refined utilitarian palette
-       Background: warm off-white (slight cream)
-       Foreground: dark slate
-       Primary: deep slate
-       Accent: amber (warmth/money) */
-    --background: 40 30% 97%;
-    --foreground: 215 25% 15%;
+    /* Mwenye Nyumba — forest green theme */
+    --background:  150 18% 95%;
+    --foreground:  155 35% 9%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card:         0 0% 100%;
+    --card-foreground: 155 35% 9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover:      0 0% 100%;
+    --popover-foreground: 155 35% 9%;
 
-    --primary: 215 30% 18%;
-    --primary-foreground: 40 30% 97%;
+    /* Forest green — primary buttons, links */
+    --primary:      148 52% 33%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 20% 92%;
-    --secondary-foreground: 215 25% 15%;
+    --secondary:    148 12% 91%;
+    --secondary-foreground: 155 30% 15%;
 
-    --muted: 40 15% 93%;
-    --muted-foreground: 215 12% 42%;
+    --muted:        148 10% 92%;
+    --muted-foreground: 150 12% 44%;
 
-    --accent: 38 92% 50%;
-    --accent-foreground: 215 30% 12%;
+    /* Bright green — accents, highlights */
+    --accent:       148 58% 40%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 45%;
+    --destructive:  0 72% 45%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 40 15% 88%;
-    --input: 40 15% 88%;
-    --ring: 215 30% 18%;
+    --border:       148 14% 88%;
+    --input:        148 14% 88%;
+    --ring:         148 52% 33%;
 
-    --radius: 0.5rem;
+    --radius: 0.6rem;
+
+    /* Sidebar — hardcoded brand dark green */
+    --sidebar: #1B3828;
+    --sidebar-hover: #243f30;
+    --sidebar-active: #2d5a3e;
+    --sidebar-text: #c4dece;
+    --sidebar-text-active: #ffffff;
+    --sidebar-border: #2a4a36;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  html {
-    font-feature-settings: "ss01", "cv11";
-  }
+  * { @apply border-border; }
+  html { font-feature-settings: "ss01", "cv11"; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   h1, h2, h3, h4 {
     @apply font-display tracking-tight;
-    font-feature-settings: "ss01", "ss02";
+    font-feature-settings: "ss01";
   }
 }
 
-/* Subtle paper texture for warmth without noise */
-.bg-paper {
-  background-image:
-    radial-gradient(at 0% 0%, hsl(40 40% 95%) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, hsl(38 60% 96%) 0px, transparent 50%);
-  background-color: hsl(var(--background));
-}
-
-/* Money figures get a refined treatment */
 .tabular-figures {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+/* Stat card shimmer for empty state */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
 }

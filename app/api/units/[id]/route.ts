@@ -13,16 +13,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const updates: Record<string, any> = {};
-  if (typeof body.name === "string") updates.name = body.name.trim();
-  if (typeof body.email === "string") updates.email = body.email.trim().toLowerCase();
-  if (typeof body.phone === "string") updates.phone = body.phone.trim() || null;
+  if (typeof body.number === "string") updates.number = body.number.trim();
+  if (typeof body.rent_amount === "number" && body.rent_amount > 0) updates.rent_amount = body.rent_amount;
+  if (body.bedrooms !== undefined) updates.bedrooms = body.bedrooms ? Number(body.bedrooms) : null;
+  if (body.bathrooms !== undefined) updates.bathrooms = body.bathrooms ? Number(body.bathrooms) : null;
   if (typeof body.notes === "string") updates.notes = body.notes.trim() || null;
+  if (typeof body.status === "string") updates.status = body.status;
 
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: "No valid fields" }, { status: 400 });
-
-  const { data, error } = await supabase.from("tenants").update(updates).eq("id", id).eq("landlord_id", user.id).select().single();
+  const { data, error } = await supabase.from("units").update(updates).eq("id", id).eq("landlord_id", user.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ tenant: data });
+  return NextResponse.json({ unit: data });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
@@ -31,16 +31,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Get unit_id before deleting so we can mark it vacant
-  const { data: tenant } = await supabase.from("tenants").select("unit_id").eq("id", id).eq("landlord_id", user.id).single();
-
-  const { error } = await supabase.from("tenants").delete().eq("id", id).eq("landlord_id", user.id);
+  const { error } = await supabase.from("units").delete().eq("id", id).eq("landlord_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-  // Mark unit vacant
-  if (tenant?.unit_id) {
-    await supabase.from("units").update({ status: "vacant" }).eq("id", tenant.unit_id);
-  }
-
   return NextResponse.json({ ok: true });
 }
