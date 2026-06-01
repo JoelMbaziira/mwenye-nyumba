@@ -1,12 +1,23 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 const MOBILE_PROVIDERS = new Set(["MTN MoMo", "Airtel Money", "M-Pesa"]);
 const CARD_PROVIDERS = new Set(["Visa", "Mastercard"]);
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+// 1. Updated 'req' to NextRequest and wrapped 'params' inside a Promise
+export async function POST(
+  req: NextRequest, 
+  { params }: { params: Promise<{ id: string }> } 
+) {
+  // 2. Await the params right away to extract the invoice ID
+  const { id } = await params;
+
   let body: any;
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  try { 
+    body = await req.json(); 
+  } catch { 
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); 
+  }
 
   const { phone, provider, method, cardNumber, cardExpiry, cardName } = body ?? {};
   const isCard = method === "card" || CARD_PROVIDERS.has(provider);
@@ -32,7 +43,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const supabase = createClient();
     const { data, error } = await supabase.rpc("pay_invoice", {
-      invoice_id: params.id,
+      invoice_id: id, // Used the awaited id here
       pay_phone: `****${rawCard.slice(-4)}`,
       pay_provider: provider,
     });
@@ -56,7 +67,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const supabase = createClient();
     const { data, error } = await supabase.rpc("pay_invoice", {
-      invoice_id: params.id,
+      invoice_id: id, // Used the awaited id here
       pay_phone: phone,
       pay_provider: provider,
     });
