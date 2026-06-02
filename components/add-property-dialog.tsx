@@ -98,19 +98,14 @@ function tokenize(s: string): { kind: "L" | "N" | "T"; v: string }[] {
   return out;
 }
 
-interface InferResult {
-  segments: Token[];
-  error?: undefined;
-}
-interface InferError {
-  error: string;
-  segments?: undefined;
-}
+type InferOutcome =
+  | { ok: true;  segments: Token[] }
+  | { ok: false; error: string };
 
-export function inferPattern(first: string, last: string): InferResult | InferError {
+export function inferPattern(first: string, last: string): InferOutcome {
   const a = first.trim(), b = last.trim();
-  if (!a) return { error: "Type a first unit name." };
-  if (!b) return { error: "Type a last unit name (e.g. the highest-numbered)." };
+  return { ok: false, error: "Type a first unit name." };
+  if (!b) return { ok: false, error: "Type a last unit name (e.g. the highest-numbered)." };
 
   const ta = tokenize(a), tb = tokenize(b);
   if (ta.length !== tb.length) {
@@ -274,7 +269,7 @@ function generateUnits(n: NamingState): { units: GeneratedUnit[]; error?: string
   if (n.mode === "list") return { units: generateFromList(n.list) };
   if (!n.first && !n.last) return { units: [] };
   const res = inferPattern(n.first, n.last);
-  if (res.error || !res.segments) return { units: [], error: res.error };
+  if (!res.ok) return { units: [], error: res.error };
   const overrides = n.varyByFloor ? n.perFloor : {};
   return { units: generateFromSegments(res.segments, overrides) };
 }
@@ -332,7 +327,7 @@ export function AddPropertyDialog() {
   const floorInfo = useMemo(() => {
     if (naming.mode !== "pattern") return { floors: [] as string[], defaultCount: 0 };
     const res = inferPattern(naming.first, naming.last);
-    if (res.error) return { floors: [], defaultCount: 0 };
+    if (!res.ok) return { floors: [], defaultCount: 0 };
     return {
       floors: floorValuesFromSegments(res.segments),
       defaultCount: innerCountFromSegments(res.segments),
