@@ -6,9 +6,10 @@ import { CheckCircle2, Clock, Home } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function PayPage({ params }: { params: { id: string } }) {
+export default async function PayPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = createClient();
-  const { data: rows } = await supabase.rpc("get_invoice_for_payment", { invoice_id: params.id });
+  const { data: rows } = await supabase.rpc("get_invoice_for_payment", { invoice_id: id });
   const invoice = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   if (!invoice) notFound();
 

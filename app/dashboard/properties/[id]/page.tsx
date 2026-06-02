@@ -16,7 +16,8 @@ const TYPE_LABELS: Record<string, string> = {
   short_term: "Short-term Rental",
 };
 
-export default async function PropertyDetailPage({ params }: { params: { id: string } }) {
+export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -25,12 +26,12 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
   const [{ data: property }, { data: rawUnits }] = await Promise.all([
     supabase.from("properties")
       .select("id, name, address, type, description")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("landlord_id", user.id)
       .single(),
     supabase.from("units")
       .select("id, number, bedrooms, bathrooms, rent_amount, status, notes")
-      .eq("property_id", params.id)
+      .eq("property_id", id)
       .eq("landlord_id", user.id)
       .order("number"),
   ]);
