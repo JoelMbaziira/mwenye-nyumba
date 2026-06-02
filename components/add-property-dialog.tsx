@@ -274,7 +274,7 @@ function generateUnits(n: NamingState): { units: GeneratedUnit[]; error?: string
   if (n.mode === "list") return { units: generateFromList(n.list) };
   if (!n.first && !n.last) return { units: [] };
   const res = inferPattern(n.first, n.last);
-  if (res.error) return { units: [], error: res.error };
+  if (res.error || !res.segments) return { units: [], error: res.error };
   const overrides = n.varyByFloor ? n.perFloor : {};
   return { units: generateFromSegments(res.segments, overrides) };
 }
