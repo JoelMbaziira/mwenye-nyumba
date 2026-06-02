@@ -59,10 +59,12 @@ export const PROPERTY_CATEGORIES = [
 
 export type PropertyCategoryValue = typeof PROPERTY_CATEGORIES[number]["value"];
 
-export const TYPE_LABELS: Record<string, string> = Object.fromEntries(
-  PROPERTY_CATEGORIES.flatMap((cat) => cat.subtypes.map((sub) => [sub.value, sub.label]))
-    .concat(PROPERTY_CATEGORIES.map((cat) => [cat.value, cat.label]))
-);
+export const TYPE_LABELS: Record<string, string> = Object.fromEntries([
+  ...PROPERTY_CATEGORIES.flatMap((cat) =>
+    cat.subtypes.map((sub) => [sub.value, sub.label] as [string, string])
+  ),
+  ...PROPERTY_CATEGORIES.map((cat) => [cat.value, cat.label] as [string, string]),
+]);
 
 // ─────────────────────────────────────────────
 // Pattern inference from two examples
