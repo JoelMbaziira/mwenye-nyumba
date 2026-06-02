@@ -6,15 +6,10 @@ import { AddUnitDialog } from "@/components/add-unit-dialog";
 import { UnitCard } from "@/components/unit-card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Home } from "lucide-react";
+import { TYPE_LABELS } from "@/components/add-property-dialog";
 
 export const dynamic = "force-dynamic";
 
-const TYPE_LABELS: Record<string, string> = {
-  residential: "Residential", commercial: "Commercial",
-  multifamily: "Multifamily",  mixed_use: "Mixed Use",
-  land: "Land",                industrial: "Industrial",
-  short_term: "Short-term Rental",
-};
 
 export default async function PropertyDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();

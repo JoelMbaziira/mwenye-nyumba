@@ -7,6 +7,7 @@ import { Building2, Home, MoreHorizontal, Trash2, ArrowRight } from "lucide-reac
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { TYPE_LABELS } from "@/components/add-property-dialog";
 
 const GRADIENTS = [
   "from-emerald-900 to-emerald-700",
@@ -15,11 +16,6 @@ const GRADIENTS = [
   "from-slate-800 to-slate-600",
   "from-cyan-900 to-cyan-700",
 ];
-
-const TYPE_LABELS: Record<string, string> = {
-  residential: "Residential", commercial: "Commercial", multifamily: "Multifamily",
-  mixed_use: "Mixed Use", land: "Land", industrial: "Industrial", short_term: "Short-term",
-};
 
 export function PropertyCard({ property }: { property: any }) {
   const router = useRouter();
