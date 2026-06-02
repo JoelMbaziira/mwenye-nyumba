@@ -69,10 +69,6 @@ export const TYPE_LABELS: Record<string, string> = Object.fromEntries([
 // ─────────────────────────────────────────────
 // Pattern inference from two examples
 // ─────────────────────────────────────────────
-// Strategy: tokenize each label into runs of letters / digits / punctuation.
-// Both labels must produce the same shape. Each position then becomes a
-// segment: text (identical strings), number range, or single-letter range.
-// The "outer" counting segment (first encountered) is treated as the floor.
 
 type Token =
   | { kind: "text"; value: string }
@@ -104,12 +100,12 @@ type InferOutcome =
 
 export function inferPattern(first: string, last: string): InferOutcome {
   const a = first.trim(), b = last.trim();
-  return { ok: false, error: "Type a first unit name." };
+  if (!a) return { ok: false, error: "Type a first unit name." };
   if (!b) return { ok: false, error: "Type a last unit name (e.g. the highest-numbered)." };
 
   const ta = tokenize(a), tb = tokenize(b);
   if (ta.length !== tb.length) {
-    return { error: `"${a}" and "${b}" don't follow the same shape.` };
+    return { ok: false, error: `"${a}" and "${b}" don't follow the same shape.` };
   }
 
   const segs: Token[] = [];
@@ -118,43 +114,41 @@ export function inferPattern(first: string, last: string): InferOutcome {
   for (let k = 0; k < ta.length; k++) {
     const x = ta[k], y = tb[k];
     if (x.kind !== y.kind) {
-      return { error: `Pieces don't match between "${a}" and "${b}".` };
+      return { ok: false, error: `Pieces don't match between "${a}" and "${b}".` };
     }
     if (x.kind === "T") {
-      if (x.v !== y.v) return { error: `Punctuation differs between the two examples.` };
+      if (x.v !== y.v) return { ok: false, error: `Punctuation differs between the two examples.` };
       segs.push({ kind: "text", value: x.v });
     } else if (x.kind === "N") {
       const from = parseInt(x.v, 10);
       const to = parseInt(y.v, 10);
-      if (to < from) return { error: `"${y.v}" should be greater than "${x.v}".` };
+      if (to < from) return { ok: false, error: `"${y.v}" should be greater than "${x.v}".` };
       const pad = x.v.length === y.v.length && (x.v.length > 1 || x.v.startsWith("0"));
       const width = Math.max(x.v.length, y.v.length);
       const isFloor = !floorAssigned;
       if (isFloor) floorAssigned = true;
       segs.push({ kind: "number", from, to, width, pad, isFloor });
-    } else { // letters
+    } else {
       if (x.v.length === 1 && y.v.length === 1) {
         const from = x.v.toUpperCase(), to = y.v.toUpperCase();
         if (to.charCodeAt(0) < from.charCodeAt(0)) {
-          return { error: `"${y.v}" should come after "${x.v}" in the alphabet.` };
+          return { ok: false, error: `"${y.v}" should come after "${x.v}" in the alphabet.` };
         }
         const isFloor = !floorAssigned;
         if (isFloor) floorAssigned = true;
         segs.push({ kind: "letter", from, to, isFloor });
       } else if (x.v === y.v) {
-        // identical multi-letter run — treat as fixed text (e.g. "Apt")
         segs.push({ kind: "text", value: x.v });
       } else {
-        return { error: `Can't auto-detect a range from "${x.v}" to "${y.v}".` };
+        return { ok: false, error: `Can't auto-detect a range from "${x.v}" to "${y.v}".` };
       }
     }
   }
-  return { segments: segs };
+  return { ok: true, segments: segs };
 }
 
 export interface GeneratedUnit { label: string; floor: string | null; }
 
-// Expand a single segment to its string values.
 function expandSegment(seg: Token): string[] {
   if (seg.kind === "text") return [seg.value];
   if (seg.kind === "number") {
@@ -170,13 +164,11 @@ function expandSegment(seg: Token): string[] {
   return out;
 }
 
-// Floor values (or [null] if no floor segment was inferred).
 export function floorValuesFromSegments(segs: Token[]): string[] {
   const floor = segs.find((s) => s.kind !== "text" && (s as Exclude<Token, { kind: "text" }>).isFloor);
   return floor ? expandSegment(floor) : [];
 }
 
-// How many units per floor the *pattern* implies (the inner cross-product).
 export function innerCountFromSegments(segs: Token[]): number {
   let n = 1;
   for (const s of segs) {
@@ -187,9 +179,6 @@ export function innerCountFromSegments(segs: Token[]): number {
   return n;
 }
 
-// Generate units, with optional per-floor count overrides.
-// overrides: map of floor value → number of units (e.g. { "A": 4, "F": 2 }).
-// Empty string or undefined for a floor means "use the pattern default".
 function generateFromSegments(
   segs: Token[],
   overrides: Record<string, string> = {},
@@ -201,7 +190,6 @@ function generateFromSegments(
   );
   const innerSegs = segs.filter((s) => s !== floorSeg);
 
-  // Order in the label: figure out which segments come before/after the floor.
   const floorIndex = floorSeg ? segs.indexOf(floorSeg) : -1;
   const beforeFloor = floorSeg ? segs.slice(0, floorIndex).filter((s) => s !== floorSeg) : innerSegs;
   const afterFloor = floorSeg ? segs.slice(floorIndex + 1) : [];
@@ -221,8 +209,7 @@ function generateFromSegments(
   const beforeParts = cross(beforeFloor);
   const afterParts = cross(afterFloor);
   const innerCombos: string[] = [];
-  for (const b of beforeParts) for (const a of afterParts) innerCombos.push(b + "|" + a);
-  // We rebuild per-floor: prefix + floor + suffix
+  for (const bp of beforeParts) for (const ap of afterParts) innerCombos.push(bp + "|" + ap);
 
   const fVals = floorSeg ? expandSegment(floorSeg) : [null as unknown as string];
   const out: GeneratedUnit[] = [];
@@ -246,7 +233,7 @@ function generateFromList(text: string): GeneratedUnit[] {
 }
 
 // ─────────────────────────────────────────────
-// Naming state — two modes only
+// Naming state
 // ─────────────────────────────────────────────
 
 type NameMode = "pattern" | "list";
@@ -257,7 +244,7 @@ interface NamingState {
   last: string;
   list: string;
   varyByFloor: boolean;
-  perFloor: Record<string, string>; // floor value → count (string for input)
+  perFloor: Record<string, string>;
 }
 
 const INITIAL_NAMING: NamingState = {
@@ -298,9 +285,7 @@ const newType = (name = "", rent = ""): UnitType => ({
 // ─────────────────────────────────────────────
 
 interface DraftUnit { key: string; number: string; floor: string | null; typeId: string; rentOverride: string; }
-
 type Step = "category" | "subtype" | "details" | "units" | "review";
-
 interface FormState { category: string; type: string; name: string; address: string; description: string; }
 const INITIAL_FORM: FormState = { category: "", type: "", name: "", address: "", description: "" };
 
@@ -323,7 +308,6 @@ export function AddPropertyDialog() {
   const preview = useMemo(() => previewUnits(naming), [naming]);
   const defaultTypeId = types[0]?.id ?? "";
 
-  // Floors derived from the current pattern (empty until both examples parse).
   const floorInfo = useMemo(() => {
     if (naming.mode !== "pattern") return { floors: [] as string[], defaultCount: 0 };
     const res = inferPattern(naming.first, naming.last);
@@ -440,8 +424,8 @@ export function AddPropertyDialog() {
         toast.success("Property added.");
       }
       setOpen(false); reset(); router.refresh();
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong.");
     } finally { setLoading(false); }
   }
 
@@ -475,7 +459,6 @@ export function AddPropertyDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step 1 */}
         {step === "category" && (
           <div className="space-y-2 py-1">
             {PROPERTY_CATEGORIES.map((cat) => (
@@ -492,7 +475,6 @@ export function AddPropertyDialog() {
           </div>
         )}
 
-        {/* Step 2 */}
         {step === "subtype" && selectedCategory && (
           <div className="space-y-1.5 py-1">
             {selectedCategory.subtypes.map((sub) => (
@@ -509,7 +491,6 @@ export function AddPropertyDialog() {
           </div>
         )}
 
-        {/* Step 3 */}
         {step === "details" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
@@ -541,7 +522,6 @@ export function AddPropertyDialog() {
           </div>
         )}
 
-        {/* Step 4 — the simple one */}
         {step === "units" && (
           <div className="space-y-4">
             {isSingleFamily ? (
@@ -552,7 +532,6 @@ export function AddPropertyDialog() {
               </div>
             ) : (
               <>
-                {/* Mode tabs */}
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => setNaming({ ...naming, mode: "pattern" })}
                     className={`rounded-lg border px-3 py-2 text-left transition hover:border-primary ${naming.mode === "pattern" ? "border-primary bg-primary/5" : "bg-white"}`}>
@@ -598,7 +577,6 @@ export function AddPropertyDialog() {
                       </ul>
                     </details>
 
-                    {/* Per-floor count override — appears only when a floor pattern is detected */}
                     {floorInfo.floors.length > 0 && (
                       <div className="space-y-2">
                         <label className="flex cursor-pointer items-start gap-2 text-sm">
@@ -629,9 +607,7 @@ export function AddPropertyDialog() {
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                               {floorInfo.floors.map((f) => (
                                 <div key={f} className="flex items-center gap-1.5">
-                                  <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
-                                    {f}
-                                  </span>
+                                  <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">{f}</span>
                                   <Input
                                     type="number" min={0} className="h-8"
                                     value={naming.perFloor[f] ?? ""}
@@ -661,7 +637,6 @@ export function AddPropertyDialog() {
                   </div>
                 )}
 
-                {/* Preview */}
                 <div className="rounded-md border bg-muted/40 px-3 py-2.5">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
                   {preview.error ? (
@@ -681,7 +656,6 @@ export function AddPropertyDialog() {
                   )}
                 </div>
 
-                {/* Rent categories */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Rent categories</Label>
@@ -725,7 +699,6 @@ export function AddPropertyDialog() {
           </div>
         )}
 
-        {/* Step 5 — review */}
         {step === "review" && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -769,10 +742,6 @@ export function AddPropertyDialog() {
     </Dialog>
   );
 }
-
-// ─────────────────────────────────────────────
-// Review-table floor group
-// ─────────────────────────────────────────────
 
 function FloorGroup({
   floorKey, rows, types, rentFor, onUpdate, onRemove, onAssignFloor,
