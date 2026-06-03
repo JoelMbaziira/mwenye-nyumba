@@ -71,7 +71,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 
   const buffer = await renderToBuffer(<ReceiptDocument data={data} />);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type":        "application/pdf",
       "Content-Disposition": `inline; filename="${payment.receipt_no}.pdf"`,
