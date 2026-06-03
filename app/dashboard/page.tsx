@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
@@ -30,7 +31,18 @@ export default async function DashboardPage() {
     supabase.from("tenants").select("id, name, created_at").eq("landlord_id", user.id).order("created_at", { ascending: false }),
     supabase.from("invoices").select("id, amount, status, period, paid_at, paid_provider, tenant_id, tenants(name)").eq("landlord_id", user.id).order("paid_at", { ascending: false }),
     supabase.from("maintenance_requests").select("id, title, status, priority, created_at, properties(name)").eq("landlord_id", user.id).in("status", ["open","in_progress"]).order("created_at", { ascending: false }).limit(3),
-    supabase.from("invoices").select("id, amount, paid_phone, paid_provider, paid_at, tenant_id, tenants(name), units(number, properties(name))").eq("landlord_id", user.id).eq("status", "pending").order("paid_at", { ascending: false }),
+    supabase.from("payments")
+      .select(`
+        id, amount, provider, phone, submitted_at,
+        invoice:invoices (
+          id, amount, period,
+          tenant:tenants (name, phone, email),
+          unit:units (number, properties (name))
+        )
+      `)
+      .eq("landlord_id", user.id)
+      .eq("status", "pending")
+      .order("submitted_at", { ascending: false }),
   ]);
 
   const thisMonthInvoices = (invoices ?? []).filter((i) => i.period === period);

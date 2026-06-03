@@ -15,10 +15,19 @@ const CARD_PROVIDERS   = ["Visa", "Mastercard"] as const;
 type PaymentMethod = "mobile" | "card";
 type Step = "form" | "submitting" | "pending";
 
-export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: number }) {
+interface Props {
+  invoiceId: string;
+  invoiceTotal: number;
+  alreadyPaid: number;
+}
+
+export function PayForm({ invoiceId, invoiceTotal, alreadyPaid }: Props) {
   const router = useRouter();
+  const balance = Math.max(0, invoiceTotal - alreadyPaid);
+
   const [method, setMethod] = useState<PaymentMethod>("mobile");
   const [step, setStep] = useState<Step>("form");
+  const [amount, setAmount] = useState<string>(String(balance));
   const [phone, setPhone] = useState("");
   const [provider, setProvider] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -32,6 +41,18 @@ export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: numb
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const amountNum = Number(amount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      toast.error("Enter a valid amount."); return;
+    }
+    if (amountNum > balance) {
+      const ok = confirm(
+        `You're paying ${formatCurrency(amountNum)} on a ${formatCurrency(balance)} balance.\n\n` +
+        `The extra ${formatCurrency(amountNum - balance)} will be credited to your next invoice. Continue?`
+      );
+      if (!ok) return;
+    }
+
     if (method === "mobile") {
       if (!provider) { toast.error("Choose a provider."); return; }
       if (!phone)    { toast.error("Enter your phone number."); return; }
@@ -44,11 +65,10 @@ export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: numb
     }
 
     setStep("submitting");
-
     try {
       const body = method === "mobile"
-        ? { phone, provider }
-        : { provider: cardNetwork, cardNumber: cardNumber.replace(/\s/g,""), cardExpiry, cardName, method: "card" };
+        ? { amount: amountNum, phone, provider }
+        : { amount: amountNum, provider: cardNetwork, cardNumber: cardNumber.replace(/\s/g,""), cardExpiry, cardName, method: "card" };
 
       const res = await fetch(`/api/invoices/${invoiceId}/pay`, {
         method: "POST",
@@ -57,7 +77,6 @@ export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: numb
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Payment failed");
-
       setStep("pending");
       router.refresh();
     } catch (e: any) {
@@ -66,7 +85,6 @@ export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: numb
     }
   }
 
-  // ── Pending confirmation state ─────────────────────────────────────────────
   if (step === "pending") {
     return (
       <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-6 text-center">
@@ -75,110 +93,127 @@ export function PayForm({ invoiceId, amount }: { invoiceId: string; amount: numb
         </div>
         <h3 className="mt-4 font-display text-xl font-semibold text-amber-900">Payment submitted</h3>
         <p className="mt-2 text-sm text-amber-800">
-          Your payment of <strong>{formatCurrency(amount)}</strong> via{" "}
+          Your payment of <strong>{formatCurrency(Number(amount))}</strong> via{" "}
           <strong>{method === "mobile" ? provider : cardNetwork}</strong> has been submitted.
-        </p>
-        <p className="mt-1 text-sm text-amber-700">
-          The landlord will review and confirm it shortly. You&apos;ll receive a receipt once approved.
+          You&apos;ll receive a receipt once your landlord approves it.
         </p>
       </div>
     );
   }
 
-  // ── Submitting ─────────────────────────────────────────────────────────────
-  if (step === "submitting") {
-    return (
-      <div className="space-y-4 py-4 text-center">
-        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Submitting payment…</p>
-      </div>
-    );
-  }
-
-  // ── Form ───────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Method tabs */}
-      <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-1">
-        {(["mobile", "card"] as const).map((m) => (
-          <button key={m} type="button" onClick={() => setMethod(m)}
-            className={cn("flex items-center justify-center gap-2 rounded-md py-2.5 text-sm font-medium transition-all",
-              method === m ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {m === "mobile" ? <Phone className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-            {m === "mobile" ? "Mobile Money" : "Card"}
-          </button>
-        ))}
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border bg-white p-6">
+      <div className="space-y-1">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Invoice balance</p>
+        <p className="text-2xl font-bold">{formatCurrency(balance)}</p>
+        {alreadyPaid > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {formatCurrency(alreadyPaid)} already paid of {formatCurrency(invoiceTotal)}
+          </p>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {method === "mobile" ? (
-          <>
+      <div className="space-y-2">
+        <Label htmlFor="pay-amount">Amount to pay (UGX)</Label>
+        <Input id="pay-amount" type="number" min={1} step={1}
+          value={amount} onChange={(e) => setAmount(e.target.value)}
+          className="text-lg font-semibold" />
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setAmount(String(balance))}
+            className="rounded-md border bg-muted/40 px-3 py-1 text-xs hover:bg-muted">
+            Pay full balance
+          </button>
+          {balance >= 2 && (
+            <button type="button" onClick={() => setAmount(String(Math.floor(balance / 2)))}
+              className="rounded-md border bg-muted/40 px-3 py-1 text-xs hover:bg-muted">
+              Pay half
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setMethod("mobile")}
+          className={cn("flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition",
+            method === "mobile" ? "border-primary bg-primary/5 font-semibold" : "bg-white hover:border-primary")}>
+          <Phone className="h-4 w-4" /> Mobile money
+        </button>
+        <button type="button" onClick={() => setMethod("card")}
+          className={cn("flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition",
+            method === "card" ? "border-primary bg-primary/5 font-semibold" : "bg-white hover:border-primary")}>
+          <CreditCard className="h-4 w-4" /> Card
+        </button>
+      </div>
+
+      {method === "mobile" ? (
+        <>
+          <div className="space-y-2">
+            <Label>Provider</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {MOBILE_PROVIDERS.map((p) => (
+                <button key={p} type="button" onClick={() => setProvider(p)}
+                  className={cn("rounded-lg border px-2 py-2 text-xs transition",
+                    provider === p ? "border-primary bg-primary/5 font-semibold" : "bg-white hover:border-primary")}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pay-phone">Phone</Label>
+            <Input id="pay-phone" type="tel" value={phone}
+              onChange={(e) => setPhone(e.target.value)} placeholder="0700 000 000" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Label>Card network</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {CARD_PROVIDERS.map((p) => (
+                <button key={p} type="button" onClick={() => setCardNetwork(p)}
+                  className={cn("rounded-lg border px-2 py-2 text-sm transition",
+                    cardNetwork === p ? "border-primary bg-primary/5 font-semibold" : "bg-white hover:border-primary")}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="card-num">Card number</Label>
+            <Input id="card-num" value={cardNumber}
+              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+              placeholder="0000 0000 0000 0000" inputMode="numeric" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Provider</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {MOBILE_PROVIDERS.map((p) => (
-                  <button key={p} type="button" onClick={() => setProvider(p)}
-                    className={cn("rounded-lg border px-2 py-2.5 text-xs font-semibold text-center transition-all",
-                      provider === p ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
-                    <span className="block text-base leading-none mb-0.5">{p === "MTN MoMo" ? "🟡" : p === "Airtel Money" ? "🔴" : "🟢"}</span>
-                    {p}
-                  </button>
-                ))}
-              </div>
+              <Label htmlFor="card-exp">Expiry</Label>
+              <Input id="card-exp" value={cardExpiry}
+                onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                placeholder="MM/YY" inputMode="numeric" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone number</Label>
-              <Input id="phone" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+256 7XX XXX XXX" />
+              <Label htmlFor="card-cvv">CVV</Label>
+              <Input id="card-cvv" value={cardCvv}
+                onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="123" inputMode="numeric" />
             </div>
-          </>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="card-name">Name on card</Label>
+            <Input id="card-name" value={cardName}
+              onChange={(e) => setCardName(e.target.value)} placeholder="As shown on card" />
+          </div>
+        </>
+      )}
+
+      <Button type="submit" size="lg" className="w-full" disabled={step === "submitting"}>
+        {step === "submitting" ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</>
         ) : (
-          <>
-            <div className="space-y-2">
-              <Label>Card network</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {CARD_PROVIDERS.map((n) => (
-                  <button key={n} type="button" onClick={() => setCardNetwork(n)}
-                    className={cn("rounded-lg border px-3 py-2.5 text-xs font-semibold text-center transition-all",
-                      cardNetwork === n ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
-                    <span className="block text-base leading-none mb-0.5">💳</span>
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Card number</Label>
-              <Input type="text" inputMode="numeric" required value={cardNumber}
-                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} placeholder="1234 5678 9012 3456" maxLength={19} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Expiry</Label>
-                <Input type="text" inputMode="numeric" required value={cardExpiry}
-                  onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} placeholder="MM/YY" maxLength={5} />
-              </div>
-              <div className="space-y-2">
-                <Label>CVV</Label>
-                <Input type="text" inputMode="numeric" required value={cardCvv}
-                  onChange={(e) => setCardCvv(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="123" maxLength={4} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Name on card</Label>
-              <Input type="text" required value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="JOHN DOE" className="uppercase" />
-            </div>
-          </>
+          <><ShieldCheck className="h-4 w-4" /> Pay {formatCurrency(Number(amount) || 0)}</>
         )}
-
-        <Button type="submit" size="lg" className="w-full mt-2 bg-primary hover:bg-primary/90">
-          Submit payment — {formatCurrency(amount)}
-        </Button>
-
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-          <ShieldCheck className="h-3 w-3" />
-          Your payment will be confirmed by the landlord.
-        </p>
-      </form>
-    </div>
+      </Button>
+    </form>
   );
 }
